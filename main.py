@@ -24,13 +24,23 @@ class Transaction():
         self.locks = dict()
         self.variableFinalValues = dict()
 
+        self.dataManagers = [DataManager(i) for i in range(1, 11)]
+
 
 class DataManager():
-    def __init__(self, id: int):
-        self.d = dict()
+    def __init__(self, dataManagerId: int):
+        self.variableValues = dict()
+        for variableIndex in range(1, 21):
+            # Each variable xi is initialized to the value 10i (10 times i)
+            variableValue = 10 * variableIndex
 
-    def __getitem__(self, item):
-        return self.d[item]
+            if variableIndex % 2 == 1:
+                # odd indexed variables are at site 1 + (indexNumber mod 10)
+                if dataManagerId == (1 + variableIndex % 10):
+                    self.variableValues["x{}".format(variableIndex)] = variableValue
+            else:
+                # even indexed variables are at all sites
+                self.variableValues["x{}".format(variableIndex)] = variableValue
 
 
 class State(Enum):
@@ -225,7 +235,7 @@ class TransactionManager():
     # print out the value of the variable if not blocked
     def read(self, transactionName: str, x: str):
         assert(transactionName in self.transactions)
-        T = self.transactions[transactionName].RO
+        T = self.transactions[transactionName]
         if T.RO:
             # TODO: print variable value
             return True
@@ -264,9 +274,9 @@ class TransactionManager():
 
     def __getLock(self, T: Transaction, x: str, lockType: str) -> bool:
         if lockType == "R":
-            aquiredLock, blockingTransaction = self.lockTable.getReadLock()
+            aquiredLock, blockingTransaction = self.lockTable.getReadLock(T, x)
         else:
-            aquiredLock, blockingTransaction = self.lockTable.getWriteLock()
+            aquiredLock, blockingTransaction = self.lockTable.getWriteLock(T, x)
 
         if aquiredLock == None:
             self.conflictGraph[blockingTransaction].append(T)
@@ -312,9 +322,8 @@ test_starvation()
 TM = TransactionManager()
 for line in stdin:
     line = line.strip()
-    if line == "":
+    if line == "" or line.startswith("//"):
         continue
-
     TM.runInstruction(line)
     TM.tick()
 
