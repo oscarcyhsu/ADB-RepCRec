@@ -22,6 +22,7 @@ class Transaction():
         self.locks = dict()
         self.modification = dict()
 
+
 class DataManager():
     def __init__(self, id: int):
         self.d = dict()
@@ -29,13 +30,13 @@ class DataManager():
     def __getitem__(self, item):
         return self.d[item]
 
+
 class State(Enum):
     GRANTED = 0
     WAITING = 1
-    
-class LockTable():
 
     
+class LockTable():
 
     def __init__(self):
         self.LockTuple = namedtuple('LockTuple', ['T', 'type', 'state'])
@@ -155,24 +156,24 @@ class TransactionManager():
         self.time += 1
 
     def begin(self, transactionName: str):
-        assert(transactionName not in self.transaction)
+        assert(transactionName not in self.transactions)
         T = Transaction(params[0], False, False, TM.time)
         self.transactions[transactionName] = T
     
     def beginRO(self, transactionName: str):
-        assert(transactionName not in self.transaction)
+        assert(transactionName not in self.transactions)
         T = Transaction(params[0], True, False, TM.time)
         self.transactions[transactionName] = T
 
     def read(self, transactionName: str, x: str):
-        assert(transactionName in self.transaction)
+        assert(transactionName in self.transactions)
         T = self.transactions[transactionName].RO
         if T.RO:
             self.__readRO(T, x)
         else:
             self.__read(T, x)
         
-    def write(transactionName: str, x: str, val: str):
+    def write(self, transactionName: str, x: str, val: str):
         val = int(val)
 
     def dump(self):
@@ -224,9 +225,9 @@ if __name__ == "__main__":
         if line == "":
             continue
 
-        command, params = line.split("(")
+        command, params = line.strip().split("(")
         # extract paramenters and get rid of leading/trailing spaces from them
-        params = [param.strip(" ") for param in params.strip("()").split(",")]
+        params = [param.strip() for param in params.strip("()").split(",")]
         if command == "begin":
             TM.begin(params[0])
         elif command == "beginRO":
@@ -246,3 +247,4 @@ if __name__ == "__main__":
         else:
             raise Exception("Command Not Found")
         TM.tick()
+
