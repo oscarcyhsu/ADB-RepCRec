@@ -322,9 +322,8 @@ test_starvation()
 TM = TransactionManager()
 for line in stdin:
     line = line.strip()
-    if line == "":
+    if line == "" or line.startswith("//"):
         continue
-
     TM.runInstruction(line)
     TM.tick()
 
