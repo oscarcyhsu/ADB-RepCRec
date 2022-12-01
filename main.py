@@ -20,7 +20,7 @@ class Transaction():
         self.blocked = blocked
         self.startTime = start
         self.locks = dict()
-        self.modification = dict()
+        self.variableFinalValues = dict()
 
 
 class DataManager():
@@ -80,11 +80,13 @@ class LockTable():
         
 
         if len(self.table[x]) == 0:
-            self.table[x].append(self.LockTuple(T, "W", State.GRANTED))
-            return "W", None
+            newLock = self.LockTuple(T, "W", State.GRANTED)
+            self.table[x].append(newLock)
+            return newLock, None
         else:
+            blockingLock = self.table[x][-1]
             self.table[x].append(self.LockTuple(T, "W", State.WAITING))
-            return None, self.table[x][-2].T
+            return None, blockingLock.T
 
     """
     return current lock that T has on x. If not exist, return None
@@ -144,14 +146,41 @@ class LockTable():
 
 
 class TransactionManager():
+
     def __init__(self):
         dataManagerTuple = namedtuple('dataManagerTuple', ['dataManager', 'lastFail', 'lastRecover'])
         self.time = 0
         self.transactions = dict() # Dict[str, Transaction]
         self.lockTable = LockTable()
-        self.opBuffer = []
+        self.instructionBuffer = []
         # self.conflictGraph = dict() # Dict[Transaction, List[Transaction], key - being waited, value - waiting
     
+
+    # when an instruction in the instructionBuffer becomes unblocked, this function can be reused to run it
+    def runInstruction(self, line: str):
+        command, params = line.split("(")
+        params = [param.strip() for param in params.strip("()").split(",")]
+
+        if command == "begin":
+            self.begin(params[0])
+        elif command == "beginRO":
+            self.beginRO(params[0])
+        elif command == "R":
+            if not self.read(params[0], params[1]):
+                self.instructionBuffer.append(line)
+        elif command == "W":
+            self.write(params[0], params[1], params[2])
+        elif command == "dump":
+            self.dump()
+        elif command == "end":
+            self.end(params[0])
+        elif command == "fail":
+            self.end(params[0])
+        elif command == "recover":
+            self.recover(params[0])
+        else:
+            raise Exception("Command Not Found")
+
     def tick(self):
         self.time += 1
 
@@ -165,16 +194,34 @@ class TransactionManager():
         T = Transaction(params[0], True, False, TM.time)
         self.transactions[transactionName] = T
 
+
+    # return True/False depending on whether the read was blocked
+    # print out the value of the variable if not blocked
     def read(self, transactionName: str, x: str):
         assert(transactionName in self.transactions)
         T = self.transactions[transactionName].RO
         if T.RO:
-            self.__readRO(T, x)
-        else:
-            self.__read(T, x)
-        
+            # TODO: print variable value
+            return True
+
+        # regular read
+        if self.__getLock(T, x, "R"):
+            # TODO: print variable value
+            return True
+        return False
+    
+
+    # return True/False depending on whether the write was blocked
     def write(self, transactionName: str, x: str, val: str):
-        val = int(val)
+        assert(transactionName in self.transactions)
+        T = self.transactions[transactionName]
+
+        if not self.__getLock(T, x, "W"):
+            return False
+
+        # TODO: implement the actual write logic
+        return True
+
 
     def dump(self):
         pass
@@ -188,15 +235,6 @@ class TransactionManager():
     def recover(self, site: int):
         pass
 
-    def __read(self, T: Transaction, x: str,) -> int:
-        if not self.__getLock(T, x, "R"):
-            self.opBuffer.append((T, x))
-            
-        else:
-            # TODO: read from one of the availiable site with x_commit_time > site_last_recover_time
-            pass
-    def __readRO(self, T: Transaction, x: str) -> int:
-        pass
 
     def __getLock(self, T: Transaction, x: str, lockType: str) -> bool:
         if lockType == "R":
@@ -208,8 +246,9 @@ class TransactionManager():
             self.conflictGraph[blockingTransaction].append(T)
             # TODO: run deadlock detection
             return False
-        else:
-            T.locks[x] = aquiredLock
+
+        T.locks[x] = aquiredLock
+        return True
 
 
 
@@ -221,30 +260,10 @@ if __name__ == "__main__":
     TM = TransactionManager()
 
     for line in stdin:
-        line = line.strip("\n")
+        line = line.strip()
         if line == "":
             continue
 
-        command, params = line.strip().split("(")
-        # extract paramenters and get rid of leading/trailing spaces from them
-        params = [param.strip() for param in params.strip("()").split(",")]
-        if command == "begin":
-            TM.begin(params[0])
-        elif command == "beginRO":
-            TM.beginRO(params[0])
-        elif command == "R":
-            TM.read(params[0], params[1])
-        elif command == "W":
-            TM.write(params[0], params[1], params[2])
-        elif command == "dump":
-            TM.dump()
-        elif command == "end":
-            TM.end(params[0])
-        elif command == "fail":
-            TM.end(params[0])
-        elif command == "recover":
-            TM.recover(params[0])
-        else:
-            raise Exception("Command Not Found")
+        TM.runInstruction(line)
         TM.tick()
 
