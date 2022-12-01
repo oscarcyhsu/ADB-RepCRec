@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from enum import Enum
 from collections import namedtuple, defaultdict
 from sys import stdin
@@ -86,8 +88,32 @@ class LockTable():
             self.table[x].append(self.LockTuple(T, "W", State.WAITING))
             return None, self.table[x][-2].T
 
+    '''
+    release the lock acquired by T on x. If x is None, release all lock aquired by T.
+    '''
+    def releaseLock(self, T: Transaction, x:str):
+        if x != None:
+            self.table[x] = list(filter(lambda x:x.T != T, self.table[x]))
+            for i in range(len(self.table[x])):
+                if i == 0:
+                    self.table[x][i].state = State.GRANTED
+                elif self.table[x][i-1].type != self.table[x][i].type: # one read-lock and one writelock
+                    self.table[x][i].state = State.WAITING
+                else:
+                    self.table[x][i].state = self.table[x][i-1].state
+        else:
+            for j in range(1, 21):
+                self.table["x"+str(j)] = list(filter(lambda x:x.T != T, self.table["x"+str(j)]))
+
+                for i in range(len(self.table[x])):
+                    if i == 0:
+                        self.table[x][i].state = State.GRANTED
+                    elif self.table[x][i-1].type != self.table[x][i].type: # one read-lock and one writelock
+                        self.table[x][i].state = State.WAITING
+                    else:
+                        self.table[x][i].state = self.table[x][i-1].state
     """
-    return current lock that T has on x. If not exist, return None
+    utility function to return current lock that T has on x. If not exist, return None
     """
     def __getExistLock(self, T: Transaction, x: str): 
         for lock in self.table[x]:
@@ -216,35 +242,62 @@ class TransactionManager():
     def __resolveDeadLock(self) -> bool: 
         pass
 
+def test_exclusive_lock():
+    LT = LockTable()
+    LT.getWriteLock("T1", "x1")
+    assert(LT.getWriteLock("T2", "x1") == (None, "T1"))
+
+def test_shared_and_exclusive_lock():
+    LT = LockTable()
+    LT.getReadLock("T1", "x2")
+    assert(LT.getWriteLock("T2", "x2") == (None, "T1"))
+
+def test_release_lock():
+    LT = LockTable()
+    LT.getReadLock("T1", "x2")
+    LT.releaseLock('T1', "x2")
+    assert(LT.getWriteLock("T2", "x2") == ("W", None))
+
+def test_starvation():
+    LT = LockTable()
+    LT.getReadLock("T1", "x1")
+    LT.getWriteLock("T2", "x1")
+    assert(LT.getReadLock("T3", "x1") == (None, "T2"))
+    
+
 if __name__ == "__main__":
+    test_exclusive_lock()
+    test_shared_and_exclusive_lock()
+    test_release_lock()
+    test_starvation()
 
-    TM = TransactionManager()
+    # TM = TransactionManager()
 
-    for line in stdin:
-        line = line.strip("\n")
-        if line == "":
-            continue
+    # for line in stdin:
+    #     line = line.strip("\n")
+    #     if line == "":
+    #         continue
 
-        command, params = line.strip().split("(")
-        # extract paramenters and get rid of leading/trailing spaces from them
-        params = [param.strip() for param in params.strip("()").split(",")]
-        if command == "begin":
-            TM.begin(params[0])
-        elif command == "beginRO":
-            TM.beginRO(params[0])
-        elif command == "R":
-            TM.read(params[0], params[1])
-        elif command == "W":
-            TM.write(params[0], params[1], params[2])
-        elif command == "dump":
-            TM.dump()
-        elif command == "end":
-            TM.end(params[0])
-        elif command == "fail":
-            TM.end(params[0])
-        elif command == "recover":
-            TM.recover(params[0])
-        else:
-            raise Exception("Command Not Found")
-        TM.tick()
+    #     command, params = line.strip().split("(")
+    #     # extract paramenters and get rid of leading/trailing spaces from them
+    #     params = [param.strip() for param in params.strip("()").split(",")]
+    #     if command == "begin":
+    #         TM.begin(params[0])
+    #     elif command == "beginRO":
+    #         TM.beginRO(params[0])
+    #     elif command == "R":
+    #         TM.read(params[0], params[1])
+    #     elif command == "W":
+    #         TM.write(params[0], params[1], params[2])
+    #     elif command == "dump":
+    #         TM.dump()
+    #     elif command == "end":
+    #         TM.end(params[0])
+    #     elif command == "fail":
+    #         TM.end(params[0])
+    #     elif command == "recover":
+    #         TM.recover(params[0])
+    #     else:
+    #         raise Exception("Command Not Found")
+    #     TM.tick()
 
