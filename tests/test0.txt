@@ -4,6 +4,11 @@
 begin(T1)
 W(T1,x1,101)
   // another testcomment
-R(T1,x1)
+W(T1,x2,202)
 end(T1)
+
+begin(T2)
+R(T2,x1)
+R(T2,x2)
+end(T2)
 dump()
