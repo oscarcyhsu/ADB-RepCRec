@@ -23,6 +23,8 @@ class Transaction():
         self.startTime = start
         self.locks = dict()
         self.variableFinalValues = dict()
+        self.variableAccessTimes = defaultdict(list)
+
 
 DATA_MANAGER_FAIL = "fail"
 DATA_MANAGER_RECOVER = "recover"
@@ -199,7 +201,7 @@ class TransactionManager():
         # self.conflictGraph = dict() # Dict[Transaction, List[Transaction], key - being waited, value - waiting
     
 
-    # when an instruction in the instructionBuffer becomes unblocked, this function can be reused to run it
+    # return True/False depending on whether the instruction can be run
     def runInstruction(self, line: str):
         print(f"run Instruction {line}")
         command, params = line.split("(")
@@ -212,18 +214,23 @@ class TransactionManager():
         elif command == "R":
             if not self.read(params[0], params[1]):
                 self.instructionBuffer.append(line)
+                return False
         elif command == "W":
-            self.write(params[0], params[1], params[2])
+            if not self.write(params[0], params[1], params[2]):
+                self.instructionBuffer.append(line)
+                return False
         elif command == "dump":
             self.dump()
         elif command == "end":
             self.end(params[0])
         elif command == "fail":
-            self.end(params[0])
+            self.fail(params[0])
         elif command == "recover":
             self.recover(params[0])
         else:
             raise Exception("Command Not Found")
+
+        return True
 
     def tick(self):
         self.time += 1
@@ -298,13 +305,14 @@ class TransactionManager():
 
                 if variableCommitTime > dataManagerLastRecoverTime:
                     print(f"{x}: {value}")
+                    T.variableAccessTimes[x].append(self.time)
                     return True
 
         return False
 
 
     def dataManagerIsUp(self, dataManagerIdx):
-        return (dataManagerIdx not in self.dataManagerStatusHistory) or \
+        return (not self.dataManagerStatusHistory[dataManagerIdx]) or \
             self.dataManagerStatusHistory[dataManagerIdx][-1][0] == DATA_MANAGER_RECOVER
     
 
@@ -324,12 +332,13 @@ class TransactionManager():
 
         if T.name not in self.transactions:
             return False
-        T.variableFinalValues[x] = val
+        T.variableFinalValues[x] = (val, self.time)
+        T.variableAccessTimes[x].append(self.time)
         return True
 
 
     def abortTransaction(self, T: Transaction):
-        print(f"Aborting transaction {T.name}")
+        print(f"{T.name} aborts")
         self.lockTable.releaseLock(T)
         del self.transactions[T.name]
 
@@ -344,7 +353,29 @@ class TransactionManager():
         assert(transactionName in self.transactions)
         T = self.transactions[transactionName]
 
-        for variable, value in T.variableFinalValues.items():
+        # Check none of the DataManagers accessed by T failed between the time when access happened and the time of commit.
+        # If a site failed, abort the transaction.
+        for variable, accessTimes in T.variableAccessTimes.items():
+            variableIdx = int(variable[1:])
+            dataManagerIndices = []
+            for i in range(1, 11):
+                if variableIdx % 2 == 0:
+                    dataManagerIndices.append(i - 1)
+                elif i == (1 + (variableIdx % 10)): # odd variable index
+                    dataManagerIndices.append(i - 1)
+
+            for accessTime in accessTimes:
+                for dataManagerIdx in dataManagerIndices:
+                    for status, statusTime in self.dataManagerStatusHistory[dataManagerIdx]:
+                        if status == DATA_MANAGER_FAIL and statusTime > accessTime and statusTime < self.time:
+                            print(f"Transaction {T.name} accessed {variable} at site {dataManagerIdx + 1}, " +
+                                f"but the site failed afterwards")
+                            self.abortTransaction(T)
+                            return
+
+
+        # Write variable values to DataManagers
+        for variable, (value, writeTime) in T.variableFinalValues.items():
             variableIdx = int(variable[1:])
             dataManagerIndices = []
             for i in range(1, 11):
@@ -356,24 +387,40 @@ class TransactionManager():
             livingDataManagerIndices = []
             for i in dataManagerIndices:
                 statusHistory = self.dataManagerStatusHistory.get(i)
-                if not statusHistory or statusHistory[-1][0] == DATA_MANAGER_RECOVER:
-                    # no failure history or recently recovered
+
+                aliveAtWriteTime = True
+                for status, statusTime in statusHistory:
+                    if statusTime > writeTime:
+                        break
+                    aliveAtWriteTime = (status == DATA_MANAGER_RECOVER)
+
+                aliveNow = (not statusHistory or statusHistory[-1][0] == DATA_MANAGER_RECOVER)
+                if aliveAtWriteTime and aliveNow:
                     livingDataManagerIndices.append(i)
 
             for i in livingDataManagerIndices:
                 livingDataManager = self.dataManagers[i]
                 livingDataManager.variableValues[variable].append((value, self.time))
 
-
         self.lockTable.releaseLock(T)
         del self.transactions[transactionName]
+        print(f"{T.name} commits")
 
-    def fail(self, site: int):
-        pass
+
+    def fail(self, site: str):
+        dataManagerIdx = int(site) - 1
+        self.dataManagerStatusHistory[dataManagerIdx].append((DATA_MANAGER_FAIL, self.time))
     
-    def recover(self, site: int):
-        # TODO: scan instructionBuffer to see if any waiting instructions can now be run (if yes, they should be RO reads)
-        pass
+    def recover(self, site: str):
+        dataManagerIdx = int(site) - 1
+        self.dataManagerStatusHistory[dataManagerIdx].append((DATA_MANAGER_RECOVER, self.time))
+        
+        # see if any waiting instructions can now be run (if yes, they should be RO reads)
+        oldInstructionBuffer = self.instructionBuffer
+        self.instructionBuffer = [] # reset the instructionBuffer
+        for line in oldInstructionBuffer:
+            # inside runInstruction(), commands that still cannot run will be added to the instructionBuffer
+            self.runInstruction(line)
 
 
     def __getLock(self, T: Transaction, x: str, lockType: str) -> bool:
