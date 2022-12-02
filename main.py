@@ -245,14 +245,65 @@ class TransactionManager():
         assert(transactionName in self.transactions)
         T = self.transactions[transactionName]
         if T.RO:
-            # TODO: print variable value
-            return True
+            variableIdx = int(x[1:])
+            variableIsReplicated = (variableIdx % 2 == 0)
+            if variableIsReplicated:
+                for dataManagerIdx, dataManager in enumerate(self.dataManagers):
+                    # find the most recent value of x that was committed earlier than T’s start time
+                    for value, commitTime in dataManager.variableValues[x][::-1]:
+                        if commitTime < T.startTime:
+                            # if there are no failure timestamps in between x’s commit time and T’s start time, read the value
+                            valueIsValid = True
+                            for status, timestamp in self.dataManagerStatusHistory[dataManagerIdx]:
+                                if status == DATA_MANAGER_FAIL and timestamp > commitTime and timestamp < T.startTime:
+                                    valueIsValid = False
+                                    break
+                            if valueIsValid:
+                                print(f"{x}: {value}")
+                                return True
+                            
+                            break # we don't care about earlier committed values of x
+                
+                # no dataManager has a valid value for x, T should abort
+                # TODO: implement logic for aborting T
+                return False
+
+            # variable is not replicated. If the corresponding site is up, read it, else wait
+            dataManagerIdx = variableIdx % 10
+            if not self.dataManagerStatusHistory[dataManagerIdx] or \
+                self.dataManagerStatusHistory[dataManagerIdx][-1][0] == DATA_MANAGER_RECOVER:
+
+                dataManager = self.dataManagers[dataManagerIdx]
+                for value, commitTime in dataManager.variableValues[x][::-1]:
+                    if commitTime < T.startTime:
+                        print(f"{x}: {value}")
+                        return True
+
+            return False
 
         # regular read
         if self.__getLock(T, x, "R"):
-            # TODO: print variable value
-            return True
+            # Find a version of x on any site that is up with x_commit_time > site_last_recover_time
+            for dataManagerIdx, dataManager in enumerate(self.dataManagers):
+                if (x not in dataManager.variableValues) or (not self.dataManagerIsUp(dataManagerIdx)):
+                    continue
+                value, variableCommitTime = dataManager.variableValues[x][-1]
+                dataManagerLastRecoverTime = -1
+                # we already know the DataManager is alive here; extract its most recent recovery time if it exists
+                statusHistory = self.dataManagerStatusHistory[dataManagerIdx]
+                if statusHistory:
+                    dataManagerLastRecoverTime = statusHistory[-1][1]
+
+                if variableCommitTime > dataManagerLastRecoverTime:
+                    print(f"{x}: {value}")
+                    return True
+
         return False
+
+
+    def dataManagerIsUp(self, dataManagerIdx):
+        return (dataManagerIdx not in self.dataManagerStatusHistory) or \
+            self.dataManagerStatusHistory[dataManagerIdx][-1][0] == DATA_MANAGER_RECOVER
     
 
     # return True/False depending on whether the write was blocked
