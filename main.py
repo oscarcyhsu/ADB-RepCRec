@@ -265,7 +265,9 @@ class TransactionManager():
                             break # we don't care about earlier committed values of x
                 
                 # no dataManager has a valid value for x, T should abort
-                # TODO: implement logic for aborting T
+                # TODO: write a test for this
+                print(f"No possible RO read for replicated variable available, aborting transaction {T.name}")
+                self.abortTransaction(T)
                 return False
 
             # variable is not replicated. If the corresponding site is up, read it, else wait
@@ -314,18 +316,22 @@ class TransactionManager():
         if not self.__getLock(T, x, "W"):
             return False
 
-        # TODO: implement the actual write logic
         hasDeadLock, victim = self.lockTable.checkDeadLock()
         while hasDeadLock:
-            print(f"detect deadlock, delete {victim.name}")
-            self.lockTable.releaseLock(victim)
-            del self.transactions[victim.name]
+            print(f"Deadlock detected, victim is {victim.name}")
+            self.abortTransaction(victim)
             hasDeadLock, victim = self.lockTable.checkDeadLock()
 
         if T.name not in self.transactions:
             return False
         T.variableFinalValues[x] = val
         return True
+
+
+    def abortTransaction(self, T: Transaction):
+        print(f"Aborting transaction {T.name}")
+        self.lockTable.releaseLock(T)
+        del self.transactions[T.name]
 
 
     def dump(self):
