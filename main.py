@@ -320,18 +320,20 @@ class TransactionManager():
     def write(self, transactionName: str, x: str, val: str):
         assert(transactionName in self.transactions)
         T = self.transactions[transactionName]
-
-        if not self.__getLock(T, x, "W"):
-            return False
+        
+        aquiredLock = self.__getLock(T, x, "W")
 
         hasDeadLock, victim = self.lockTable.checkDeadLock()
         while hasDeadLock:
             print(f"Deadlock detected, victim is {victim.name}")
             self.abortTransaction(victim)
             hasDeadLock, victim = self.lockTable.checkDeadLock()
-
-        if T.name not in self.transactions:
+        
+        if not aquiredLock:
             return False
+        if T.name not in self.transactions: # checkDeadLock abort T
+            return False
+
         T.variableFinalValues[x] = (val, self.time)
         T.variableAccessTimes[x].append(self.time)
         return True
@@ -384,7 +386,7 @@ class TransactionManager():
                 elif i == (1 + (variableIdx % 10)): # odd variable index
                     dataManagerIndices.append(i - 1)
             
-            livingDataManagerIndices = []
+            livingDataManagerIndices = [] # alive at write time, and also alive now
             for i in dataManagerIndices:
                 statusHistory = self.dataManagerStatusHistory.get(i)
 
@@ -401,6 +403,7 @@ class TransactionManager():
             for i in livingDataManagerIndices:
                 livingDataManager = self.dataManagers[i]
                 livingDataManager.variableValues[variable].append((value, self.time))
+                print(f"Site {i + 1} is written by transaction {T.name}")
 
         self.lockTable.releaseLock(T)
         del self.transactions[transactionName]
@@ -422,14 +425,20 @@ class TransactionManager():
             # inside runInstruction(), commands that still cannot run will be added to the instructionBuffer
             self.runInstruction(line)
 
-
+    
     def __getLock(self, T: Transaction, x: str, lockType: str) -> bool:
         if lockType == "R":
             aquiredLock, blockingTransaction = self.lockTable.getReadLock(T, x)
         else:
             aquiredLock, blockingTransaction = self.lockTable.getWriteLock(T, x)
-        T.locks[x] = aquiredLock
-        return True
+        
+        if not aquiredLock:
+            print(f"Transaction {T.name} wait for transaction {blockingTransaction.name} " 
+                   "because of lock conflict")
+        else:
+            T.locks[x] = aquiredLock
+
+        return aquiredLock is not None
 
 
 
