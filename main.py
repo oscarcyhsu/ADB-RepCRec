@@ -63,7 +63,7 @@ class LockTable():
         curLock = self.__getExistLock(T, x)
         if curLock:
             if curLock.state == State.GRANTED:
-                return curLock, None
+                return curLock.type, None
             else:
                 raise Exception("encounter blocked operation from the same transaction")
 
@@ -86,7 +86,7 @@ class LockTable():
         curLock = self.__getExistLock(T, x)
         if curLock:
             if curLock.type == "W" and curLock.state == State.GRANTED:
-                return curLock, None
+                return curLock.type, None
             else:
                 raise Exception("encounter blocked operation from the same transaction")
         
@@ -137,19 +137,19 @@ class LockTable():
     bool : whether the there exists a deadlock
     Transacion: the transation to kill to resolve the deadlock
     '''
-    def __checkDeadLock(self) -> tuple[bool, Transaction]:
-        
+    def checkDeadLock(self) -> tuple[bool, Transaction]:
         # build graph
         graph = defaultdict(list)
-        visited = defaultdict(0)
-        for queue in self.table:
+        visited = defaultdict(int)
+        for queue in self.table.values():
             # build edge
             for i in range(1, len(queue)):
                 if queue[i].state == State.WAITING:
                     graph[queue[i-1].T].append(queue[i].T)
             # get all node
             for T, _, _ in queue:
-                visited.add(T)
+                visited[T] = 0
+        
         # cycle detection
         def dfs(T: Transaction, trail):
             if visited[T] == 1:
@@ -293,37 +293,74 @@ class TransactionManager():
 
 def test_exclusive_lock():
     LT = LockTable()
-    LT.getWriteLock("T1", "x1")
-    assert(LT.getWriteLock("T2", "x1") == (None, "T1"))
+    T1 = Transaction("T1", False, False, 0)
+    T2 = Transaction("T2", False, False, 1)
+
+    LT.getWriteLock(T1, "x1")
+    assert(LT.getWriteLock(T2, "x1") == (None, T1))
 
 def test_shared_and_exclusive_lock():
     LT = LockTable()
-    LT.getReadLock("T1", "x2")
-    assert(LT.getWriteLock("T2", "x2") == (None, "T1"))
+    T1 = Transaction("T1", False, False, 0)
+    T2 = Transaction("T2", False, False, 1)
+
+    LT.getReadLock(T1, "x2")
+    assert(LT.getWriteLock(T2, "x2") == (None, T1))
 
 def test_release_lock():
     LT = LockTable()
-    LT.getReadLock("T1", "x2")
-    LT.releaseLock('T1', "x2")
-    assert(LT.getWriteLock("T2", "x2") == ("W", None))
+    T1 = Transaction("T1", False, False, 0)
+    T2 = Transaction("T2", False, False, 1)
+
+    LT.getReadLock(T1, "x2")
+    LT.releaseLock(T1, "x2")
+    assert(LT.getWriteLock(T2, "x2") == ("W", None))
 
 def test_starvation():
     LT = LockTable()
-    LT.getReadLock("T1", "x1")
-    LT.getWriteLock("T2", "x1")
-    assert(LT.getReadLock("T3", "x1") == (None, "T2"))
+    T1 = Transaction("T1", False, False, 0)
+    T2 = Transaction("T2", False, False, 1)
+    T3 = Transaction("T3", False, False, 2)
+
+    LT.getReadLock(T1, "x1")
+    LT.getWriteLock(T2, "x1")
+    assert(LT.getReadLock(T3, "x1") == (None, T2))
     
+def test_repeated_lock():
+    LT = LockTable()
+    T1 = Transaction("T1", False, False, 0)
+    T2 = Transaction("T2", False, False, 1)
+
+    LT.getReadLock(T1, "x1")
+    assert(LT.getReadLock(T1, "x1") == ("R", None))
+
+    LT.getWriteLock(T1, "x2")
+    assert(LT.getReadLock(T1, "x2") == ("W", None))
+    assert(LT.getWriteLock(T1, "x2") == ("W", None))
+
+def test_dead_lock():
+    LT = LockTable()
+    T1 = Transaction("T1", False, False, 0)
+    T2 = Transaction("T2", False, False, 1)
+
+    LT.getWriteLock(T1, "x1")
+    LT.getWriteLock(T2, "x2")
+    LT.getWriteLock(T1, "x2")
+    LT.getWriteLock(T2, "x1")
+    assert(LT.checkDeadLock() == (True, T2))
 
 test_exclusive_lock()
 test_shared_and_exclusive_lock()
 test_release_lock()
 test_starvation()
+test_repeated_lock()
+test_dead_lock()
 
-TM = TransactionManager()
-for line in stdin:
-    line = line.strip()
-    if line == "" or line.startswith("//"):
-        continue
-    TM.runInstruction(line)
-    TM.tick()
+# TM = TransactionManager()
+# for line in stdin:
+#     line = line.strip()
+#     if line == "" or line.startswith("//"):
+#         continue
+#     TM.runInstruction(line)
+#     TM.tick()
 
