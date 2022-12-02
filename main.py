@@ -190,6 +190,10 @@ class TransactionManager():
         # instructions waiting because of lock conflict (write, regular read) or site failure (RO read)
         self.instructionBuffer = []
         self.dataManagers = [DataManager(i, self.time) for i in range(1, 11)]
+
+        # { dataManagerIdx: [('fail', time1), ('recover', time2)] }
+        self.dataManagerStatusHistory = defaultdict(list)
+
         # self.conflictGraph = dict() # Dict[Transaction, List[Transaction], key - being waited, value - waiting
     
 
@@ -281,7 +285,17 @@ class TransactionManager():
         assert(transactionName in self.transactions)
         T = self.transactions[transactionName]
         # TODO: update new variable value to dataManager
-        print(T.variableFinalValues)
+        for variable, value in T.variableFinalValues.items():
+            variableIdx = int(variable[1:])
+            dataManagerIndices = []
+            for i in range(1, 11):
+                if variableIdx % 2 == 0:
+                    dataManagerIndices.append(i - 1)
+                elif i == (1 + (variableIdx % 10)): # odd variable index
+                    dataManagerIndices.append(i - 1)
+            print(variable, dataManagerIndices)
+            # self.dataManagerStatusHistory
+
         self.lockTable.releaseLock(T)
         del self.transactions[transactionName]
 

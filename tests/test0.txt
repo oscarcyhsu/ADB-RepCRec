@@ -5,5 +5,8 @@ begin(T1)
 W(T1,x1,101)
   // another testcomment
 R(T1,x1)
+W(T1,x2,202)
+  // another testcomment
+R(T1,x2)
 end(T1)
 dump()
