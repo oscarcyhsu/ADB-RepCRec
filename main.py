@@ -26,8 +26,9 @@ class Transaction():
 
 
 class DataManager():
-    def __init__(self, dataManagerId: int):
-        self.variableValues = dict()
+    def __init__(self, dataManagerId: int, initTime: int):
+        # { 'variableName': [(value, commitTime)] }
+        self.variableValues = defaultdict(list)
         for variableIndex in range(1, 21):
             # Each variable xi is initialized to the value 10i (10 times i)
             variableValue = 10 * variableIndex
@@ -35,10 +36,10 @@ class DataManager():
             if variableIndex % 2 == 1:
                 # odd indexed variables are at site 1 + (indexNumber mod 10)
                 if dataManagerId == (1 + variableIndex % 10):
-                    self.variableValues["x{}".format(variableIndex)] = variableValue
+                    self.variableValues["x{}".format(variableIndex)].append((variableValue, initTime))
             else:
                 # even indexed variables are at all sites
-                self.variableValues["x{}".format(variableIndex)] = variableValue
+                self.variableValues["x{}".format(variableIndex)].append((variableValue, initTime))
 
 
 class State(Enum):
@@ -188,7 +189,7 @@ class TransactionManager():
         self.lockTable = LockTable()
         # instructions waiting because of lock conflict (write, regular read) or site failure (RO read)
         self.instructionBuffer = []
-        self.dataManagers = [DataManager(i) for i in range(1, 11)]
+        self.dataManagers = [DataManager(i, self.time) for i in range(1, 11)]
         # self.conflictGraph = dict() # Dict[Transaction, List[Transaction], key - being waited, value - waiting
     
 
@@ -273,7 +274,8 @@ class TransactionManager():
     def dump(self):
         for i, dataManager in enumerate(self.dataManagers):
             print(f"==== data in dataManager{i+1} ====")
-            print(dataManager.variableValues)
+            print('   '.join(['{}:{}'.format(variable, value_timestamp_list[-1][0])
+                for variable, value_timestamp_list in dataManager.variableValues.items()]))
 
     def end(self, transactionName: str):
         assert(transactionName in self.transactions)
