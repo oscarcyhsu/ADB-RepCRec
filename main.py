@@ -343,7 +343,9 @@ class TransactionManager():
     def end(self, transactionName: str):
         assert(transactionName in self.transactions)
         T = self.transactions[transactionName]
+        print(f"Commiting transaction {T.name}")
 
+        affectedDataManagerIndices = set()
         for variable, value in T.variableFinalValues.items():
             variableIdx = int(variable[1:])
             dataManagerIndices = []
@@ -358,13 +360,17 @@ class TransactionManager():
                 statusHistory = self.dataManagerStatusHistory.get(i)
                 if not statusHistory or statusHistory[-1][0] == DATA_MANAGER_RECOVER:
                     # no failure history or recently recovered
+                    # TODO: check site didn't fail between start and end of transaction
                     livingDataManagerIndices.append(i)
 
             for i in livingDataManagerIndices:
                 livingDataManager = self.dataManagers[i]
                 livingDataManager.variableValues[variable].append((value, self.time))
-
-
+                affectedDataManagerIndices.add(i+1)
+        
+        for i in affectedDataManagerIndices:
+            print(f"site {i} is written by transaction {T.name}")
+        
         self.lockTable.releaseLock(T)
         del self.transactions[transactionName]
 
