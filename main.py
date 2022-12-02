@@ -24,8 +24,6 @@ class Transaction():
         self.locks = dict()
         self.variableFinalValues = dict()
 
-        self.dataManagers = [DataManager(i) for i in range(1, 11)]
-
 
 class DataManager():
     def __init__(self, dataManagerId: int):
@@ -188,7 +186,9 @@ class TransactionManager():
         self.time = 0
         self.transactions = dict() # Dict[str, Transaction]
         self.lockTable = LockTable()
+        # instructions waiting because of lock conflict (write, regular read) or site failure (RO read)
         self.instructionBuffer = []
+        self.dataManagers = [DataManager(i) for i in range(1, 11)]
         # self.conflictGraph = dict() # Dict[Transaction, List[Transaction], key - being waited, value - waiting
     
 
@@ -263,12 +263,15 @@ class TransactionManager():
         pass
 
     def end(self, transactionName: str):
+        # TODO: release locks held by the transaction
+        #   scan instructionBuffer to see if any waiting instructions can now be run (if yes, they should be RO reads)
         pass
 
     def fail(self, site: int):
         pass
     
     def recover(self, site: int):
+        # TODO: scan instructionBuffer to see if any waiting instructions can now be run (if yes, they should be RO reads)
         pass
 
 
@@ -349,18 +352,18 @@ def test_dead_lock():
     LT.getWriteLock(T2, "x1")
     assert(LT.checkDeadLock() == (True, T2))
 
-test_exclusive_lock()
-test_shared_and_exclusive_lock()
-test_release_lock()
-test_starvation()
-test_repeated_lock()
-test_dead_lock()
+# test_exclusive_lock()
+# test_shared_and_exclusive_lock()
+# test_release_lock()
+# test_starvation()
+# test_repeated_lock()
+# test_dead_lock()
 
-# TM = TransactionManager()
-# for line in stdin:
-#     line = line.strip()
-#     if line == "" or line.startswith("//"):
-#         continue
-#     TM.runInstruction(line)
-#     TM.tick()
+TM = TransactionManager()
+for line in stdin:
+    line = line.strip()
+    if line == "" or line.startswith("//"):
+        continue
+    TM.runInstruction(line)
+    TM.tick()
 
