@@ -24,8 +24,6 @@ class Transaction():
         self.locks = dict()
         self.variableFinalValues = dict()
 
-        self.dataManagers = [DataManager(i) for i in range(1, 11)]
-
 
 class DataManager():
     def __init__(self, dataManagerId: int):
@@ -189,11 +187,13 @@ class TransactionManager():
         self.transactions = dict() # Dict[str, Transaction]
         self.lockTable = LockTable()
         self.instructionBuffer = []
+        self.dataManagers = [DataManager(i) for i in range(1, 11)]
         # self.conflictGraph = dict() # Dict[Transaction, List[Transaction], key - being waited, value - waiting
     
 
     # when an instruction in the instructionBuffer becomes unblocked, this function can be reused to run it
     def runInstruction(self, line: str):
+        print(f"run Instruction {line}")
         command, params = line.split("(")
         params = [param.strip() for param in params.strip("()").split(",")]
 
@@ -356,11 +356,11 @@ test_starvation()
 test_repeated_lock()
 test_dead_lock()
 
-# TM = TransactionManager()
-# for line in stdin:
-#     line = line.strip()
-#     if line == "" or line.startswith("//"):
-#         continue
-#     TM.runInstruction(line)
-#     TM.tick()
+TM = TransactionManager()
+for line in stdin:
+    line = line.strip()
+    if line == "" or line.startswith("//"):
+        continue
+    TM.runInstruction(line)
+    TM.tick()
 
