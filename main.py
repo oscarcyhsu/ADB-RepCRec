@@ -24,6 +24,8 @@ class Transaction():
         self.locks = dict()
         self.variableFinalValues = dict()
 
+DATA_MANAGER_FAIL = "fail"
+DATA_MANAGER_RECOVER = "recover"
 
 class DataManager():
     def __init__(self, dataManagerId: int, initTime: int):
@@ -191,7 +193,7 @@ class TransactionManager():
         self.instructionBuffer = []
         self.dataManagers = [DataManager(i, self.time) for i in range(1, 11)]
 
-        # { dataManagerIdx: [('fail', time1), ('recover', time2)] }
+        # { dataManagerIdx: [(DATA_MANAGER_FAIL, time1), (DATA_MANAGER_RECOVER, time2)] }
         self.dataManagerStatusHistory = defaultdict(list)
 
         # self.conflictGraph = dict() # Dict[Transaction, List[Transaction], key - being waited, value - waiting
@@ -284,7 +286,7 @@ class TransactionManager():
     def end(self, transactionName: str):
         assert(transactionName in self.transactions)
         T = self.transactions[transactionName]
-        # TODO: update new variable value to dataManager
+
         for variable, value in T.variableFinalValues.items():
             variableIdx = int(variable[1:])
             dataManagerIndices = []
@@ -293,8 +295,18 @@ class TransactionManager():
                     dataManagerIndices.append(i - 1)
                 elif i == (1 + (variableIdx % 10)): # odd variable index
                     dataManagerIndices.append(i - 1)
-            print(variable, dataManagerIndices)
-            # self.dataManagerStatusHistory
+            
+            livingDataManagerIndices = []
+            for i in dataManagerIndices:
+                statusHistory = self.dataManagerStatusHistory.get(i)
+                if not statusHistory or statusHistory[-1][0] == DATA_MANAGER_RECOVER:
+                    # no failure history or recently recovered
+                    livingDataManagerIndices.append(i)
+
+            for i in livingDataManagerIndices:
+                livingDataManager = self.dataManagers[i]
+                livingDataManager.variableValues[variable].append((value, self.time))
+
 
         self.lockTable.releaseLock(T)
         del self.transactions[transactionName]
