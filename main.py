@@ -101,7 +101,7 @@ class LockTable():
     '''
     release the lock acquired by T on x. If x is None, release all lock aquired by T.
     '''
-    def releaseLock(self, T: Transaction, x:str):
+    def releaseLock(self, T: Transaction, x:str = None):
         if x != None:
             self.table[x] = list(filter(lambda x:x.T != T, self.table[x]))
             for i in range(len(self.table[x])):
@@ -113,15 +113,16 @@ class LockTable():
                     self.table[x][i].state = self.table[x][i-1].state
         else:
             for j in range(1, 21):
-                self.table["x"+str(j)] = list(filter(lambda x:x.T != T, self.table["x"+str(j)]))
+                x = "x"+str(j)
+                self.table[x] = list(filter(lambda x:x.T != T, self.table[x]))
 
                 for i in range(len(self.table[x])):
                     if i == 0:
-                        self.table[x][i].state = State.GRANTED
+                        self.table[x][i] = self.table[x][i]._replace(state = State.GRANTED)
                     elif self.table[x][i-1].type != self.table[x][i].type: # one read-lock and one writelock
-                        self.table[x][i].state = State.WAITING
+                        self.table[x][i] = self.table[x][i]._replace(state = State.WAITING)
                     else:
-                        self.table[x][i].state = self.table[x][i-1].state
+                        self.table[x][i] = self.table[x][i]._replace(state = self.table[x][i-1].state)
     """
     utility function to return current lock that T has on x. If not exist, return None
     """
@@ -136,6 +137,7 @@ class LockTable():
     Transacion: the transation to kill to resolve the deadlock
     '''
     def checkDeadLock(self) -> tuple[bool, Transaction]:
+        
         # build graph
         graph = defaultdict(list)
         visited = defaultdict(int)
@@ -147,18 +149,17 @@ class LockTable():
             # get all node
             for T, _, _ in queue:
                 visited[T] = 0
-        
         # cycle detection
         def dfs(T: Transaction, trail):
             if visited[T] == 1:
                 return True, trail
             elif visited[T] == 2:
                 return False, []
-            
+
             visited[T] = 1
             trail.append(T)
             for neighbor in graph[T]:
-                if dfs(neighbor, trail):
+                if dfs(neighbor, trail)[0]:
                     return True, trail
             visited[T] = 2
             trail.pop()
@@ -168,7 +169,6 @@ class LockTable():
         
         for node in visited.keys():
             haveCycle, trail = dfs(node, [])
-
             if haveCycle:
                 youngestT, youngestAge = None, None
                 for T in trail:
@@ -194,6 +194,7 @@ class TransactionManager():
 
     # when an instruction in the instructionBuffer becomes unblocked, this function can be reused to run it
     def runInstruction(self, line: str):
+        print(f"run Instruction {line}")
         command, params = line.split("(")
         params = [param.strip() for param in params.strip("()").split(",")]
 
@@ -256,16 +257,31 @@ class TransactionManager():
             return False
 
         # TODO: implement the actual write logic
+        hasDeadLock, victim = self.lockTable.checkDeadLock()
+        while hasDeadLock:
+            print(f"detect deadlock, delete {victim.name}")
+            self.lockTable.releaseLock(victim)
+            del self.transactions[victim.name]
+            hasDeadLock, victim = self.lockTable.checkDeadLock()
+
+        if T.name not in self.transactions:
+            return False
+        T.variableFinalValues[x] = val
         return True
 
 
     def dump(self):
-        pass
+        for i, dataManager in enumerate(self.dataManagers):
+            print(f"==== data in dataManager{i+1} ====")
+            print(dataManager.variableValues)
 
     def end(self, transactionName: str):
-        # TODO: release locks held by the transaction
-        #   scan instructionBuffer to see if any waiting instructions can now be run (if yes, they should be RO reads)
-        pass
+        assert(transactionName in self.transactions)
+        T = self.transactions[transactionName]
+        # TODO: update new variable value to dataManager
+        print(T.variableFinalValues)
+        self.lockTable.releaseLock(T)
+        del self.transactions[transactionName]
 
     def fail(self, site: int):
         pass
@@ -280,12 +296,6 @@ class TransactionManager():
             aquiredLock, blockingTransaction = self.lockTable.getReadLock(T, x)
         else:
             aquiredLock, blockingTransaction = self.lockTable.getWriteLock(T, x)
-
-        if aquiredLock == None:
-            self.conflictGraph[blockingTransaction].append(T)
-            # TODO: run deadlock detection
-            return False
-
         T.locks[x] = aquiredLock
         return True
 
