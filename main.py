@@ -115,7 +115,7 @@ class LockTable():
             for j in range(1, 21):
                 self.table["x"+str(j)] = list(filter(lambda x:x.T != T, self.table["x"+str(j)]))
 
-                for i in range(len(self.table[x])):
+                for i in range(len(self.table["x"+str(j)])):
                     if i == 0:
                         self.table[x][i].state = State.GRANTED
                     elif self.table[x][i-1].type != self.table[x][i].type: # one read-lock and one writelock
@@ -259,7 +259,7 @@ class TransactionManager():
         hasDeadLock, victim = self.lockTable.checkDeadLock()
         while hasDeadLock:
             self.lockTable.releaseLock(victim)
-            del self.transactions[transactionName]
+            del self.transactions[victim]
             hasDeadLock, victim = self.lockTable.checkDeadLock()
 
         T.variableFinalValues[x] = val
@@ -272,7 +272,11 @@ class TransactionManager():
             print(dataManager.variableValues)
 
     def end(self, transactionName: str):
-        pass
+        assert(transactionName in self.transactions)
+        T = self.transactions[transactionName]
+        # TODO: update new variable value to dataManager
+        self.lockTable.releaseLock(T)
+        del self.transactions[transactionName]
 
     def fail(self, site: int):
         pass
