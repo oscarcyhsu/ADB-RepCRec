@@ -101,7 +101,7 @@ class LockTable():
     '''
     release the lock acquired by T on x. If x is None, release all lock aquired by T.
     '''
-    def releaseLock(self, T: Transaction, x:str):
+    def releaseLock(self, T: Transaction, x:str = None):
         if x != None:
             self.table[x] = list(filter(lambda x:x.T != T, self.table[x]))
             for i in range(len(self.table[x])):
@@ -256,11 +256,20 @@ class TransactionManager():
             return False
 
         # TODO: implement the actual write logic
+        hasDeadLock, victim = self.lockTable.checkDeadLock()
+        while hasDeadLock:
+            self.lockTable.releaseLock(victim)
+            del self.transactions[transactionName]
+            hasDeadLock, victim = self.lockTable.checkDeadLock()
+
+        T.variableFinalValues[x] = val
         return True
 
 
     def dump(self):
-        pass
+        for i, dataManager in enumerate(self.dataManagers):
+            print(f"==== data in dataManager{i+1} ====")
+            print(dataManager.variableValues)
 
     def end(self, transactionName: str):
         pass
