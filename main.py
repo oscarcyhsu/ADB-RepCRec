@@ -289,6 +289,7 @@ class TransactionManager():
                         print(f"{x}: {value}")
                         return True
 
+            print(f"RO transaction {T.name} waiting to read unreplicated variable {x} on failed site {dataManagerIdx+1}")
             return False
 
         # regular read
@@ -311,6 +312,7 @@ class TransactionManager():
                     T.variableAccessTimes[x].append(self.time)
                     return True
 
+        print(f"Transaction {T.name} waiting to read variable {x} due to lock conflict")
         return False
 
 
@@ -325,6 +327,7 @@ class TransactionManager():
         T = self.transactions[transactionName]
         
         if not self.__getLock(T, x, "W"):
+            print(f"Transaction {T.name} waiting to write variable {x} due to lock conflict")
             return False
         # aquiredLock = self.__getLock(T, x, "W")
 
@@ -337,6 +340,10 @@ class TransactionManager():
         # if not aquiredLock:
         #     return False
         if T.name not in self.transactions:
+            # TODO: what does this return False mean? does anything need to be printed here?
+            # Cases where we need to print information:
+            # -- every time a transaction waits because of a lock conflict
+            # -- every time a transaction waits because a site is down (e.g., waiting for an unreplicated item on a failed site).
             return False
 
         T.variableFinalValues[x] = (val, self.time)
