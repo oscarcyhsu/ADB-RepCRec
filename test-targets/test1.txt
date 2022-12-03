@@ -3,9 +3,13 @@ run Instruction begin(T2)
 run Instruction W(T1,x1,101)
 run Instruction W(T2,x2,202)
 run Instruction W(T1,x2,102)
+Transaction T1 wait for transaction T2 because of lock conflict
 run Instruction W(T2,x1,201)
+Transaction T2 wait for transaction T1 because of lock conflict
 Deadlock detected, victim is T2
 T2 aborts
+run Instruction W(T1,x2,102)
+run Instruction W(T2,x1,201)
 run Instruction end(T1)
 Site 2 is written by transaction T1
 Site 1 is written by transaction T1

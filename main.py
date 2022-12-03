@@ -328,7 +328,6 @@ class TransactionManager():
                     T.variableAccessTimes[x].append(self.time)
                     return True
 
-        print(f"Transaction {T.name} waiting to read variable {x} due to lock conflict")
         return False
 
 
@@ -344,7 +343,6 @@ class TransactionManager():
         T = self.transactions[transactionName]
         
         if not self.__getLock(T, x, "W"):
-            print(f"Transaction {T.name} waiting to write variable {x} due to lock conflict")
             return False
 
         T.variableFinalValues[x] = (val, self.time)
