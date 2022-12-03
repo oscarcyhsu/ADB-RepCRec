@@ -1,0 +1,19 @@
+run Instruction begin(T1)
+run Instruction beginRO(T2)
+run Instruction R(T2,x1)
+x1: 10
+run Instruction R(T2,x2)
+x2: 20
+run Instruction W(T1,x3,33)
+run Instruction end(T1)
+Site 4 is written by transaction T1
+T1 commits
+run Instruction beginRO(T3)
+run Instruction R(T3,x3)
+x3: 33
+run Instruction R(T2,x3)
+x3: 30
+run Instruction end(T2)
+T2 commits
+run Instruction end(T3)
+T3 commits

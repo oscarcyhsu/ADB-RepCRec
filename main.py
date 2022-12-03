@@ -307,6 +307,7 @@ class TransactionManager():
                         print(f"{x}: {value}")
                         return True
 
+            print(f"RO transaction {T.name} waiting to read unreplicated variable {x} on failed site {dataManagerIdx+1}")
             return False
 
         # regular read
