@@ -200,6 +200,24 @@ class TransactionManager():
 
         # self.conflictGraph = dict() # Dict[Transaction, List[Transaction], key - being waited, value - waiting
     
+    def run(self, lines: str):
+        self.instructionBuffer = list(lines)
+
+        while self.instructionBuffer:
+            # see if any waiting instructions can now be run
+            for i, line in enumerate(self.instructionBuffer):
+                # resolve deadlock at the beginning of a tick
+                hasDeadLock, victim = self.lockTable.checkDeadLock()
+                if hasDeadLock:
+                    print(f"Deadlock detected, victim is {victim.name}")
+                    self.abortTransaction(victim)
+                    hasDeadLock, victim = self.lockTable.checkDeadLock()
+                    break
+
+                if self.runInstruction(line):
+                    self.instructionBuffer.pop(i)
+                    self.tick()
+                    break
 
     # return True/False depending on whether the instruction can be run
     def runInstruction(self, line: str):
@@ -213,11 +231,9 @@ class TransactionManager():
             self.beginRO(params[0])
         elif command == "R":
             if not self.read(params[0], params[1]):
-                self.instructionBuffer.append(line)
                 return False
         elif command == "W":
             if not self.write(params[0], params[1], params[2]):
-                self.instructionBuffer.append(line)
                 return False
         elif command == "dump":
             self.dump()
@@ -249,7 +265,9 @@ class TransactionManager():
     # return True/False depending on whether the read was blocked
     # print out the value of the variable if not blocked
     def read(self, transactionName: str, x: str):
-        assert(transactionName in self.transactions)
+        if transactionName not in self.transactions:
+            return True
+
         T = self.transactions[transactionName]
         variableIdx = int(x[1:])
         variableIsReplicated = (variableIdx % 2 == 0)
@@ -293,8 +311,6 @@ class TransactionManager():
             return False
 
         # regular read
-        # TODO: locking behavior doesn't pass test9
-        # after W(T2,x4,44) but before end(T2),  R(T3,x4) still executes
         if self.__getLock(T, x, "R"):
             # Find a version of x on any site that is up with x_commit_time > site_last_recover_time
             for dataManagerIdx, dataManager in enumerate(self.dataManagers):
@@ -323,27 +339,12 @@ class TransactionManager():
 
     # return True/False depending on whether the write was blocked
     def write(self, transactionName: str, x: str, val: str):
-        assert(transactionName in self.transactions)
+        if transactionName not in self.transactions:
+            return True
         T = self.transactions[transactionName]
         
         if not self.__getLock(T, x, "W"):
             print(f"Transaction {T.name} waiting to write variable {x} due to lock conflict")
-            return False
-        # aquiredLock = self.__getLock(T, x, "W")
-
-        hasDeadLock, victim = self.lockTable.checkDeadLock()
-        while hasDeadLock:
-            print(f"Deadlock detected, victim is {victim.name}")
-            self.abortTransaction(victim)
-            hasDeadLock, victim = self.lockTable.checkDeadLock()
-        
-        # if not aquiredLock:
-        #     return False
-        if T.name not in self.transactions:
-            # TODO: what does this return False mean? does anything need to be printed here?
-            # Cases where we need to print information:
-            # -- every time a transaction waits because of a lock conflict
-            # -- every time a transaction waits because a site is down (e.g., waiting for an unreplicated item on a failed site).
             return False
 
         T.variableFinalValues[x] = (val, self.time)
@@ -420,7 +421,7 @@ class TransactionManager():
         self.lockTable.releaseLock(T)
         del self.transactions[transactionName]
         print(f"{T.name} commits")
-
+        
 
     def fail(self, site: str):
         dataManagerIdx = int(site) - 1
@@ -430,12 +431,14 @@ class TransactionManager():
         dataManagerIdx = int(site) - 1
         self.dataManagerStatusHistory[dataManagerIdx].append((DATA_MANAGER_RECOVER, self.time))
         
-        # see if any waiting instructions can now be run (if yes, they should be RO reads)
-        oldInstructionBuffer = self.instructionBuffer
-        self.instructionBuffer = [] # reset the instructionBuffer
-        for line in oldInstructionBuffer:
-            # inside runInstruction(), commands that still cannot run will be added to the instructionBuffer
-            self.runInstruction(line)
+        # moved rerun logic to self.run
+
+        # # see if any waiting instructions can now be run (if yes, they should be RO reads)
+        # oldInstructionBuffer = self.instructionBuffer
+        # self.instructionBuffer = [] # reset the instructionBuffer
+        # for line in oldInstructionBuffer:
+        #     # inside runInstruction(), commands that still cannot run will be added to the instructionBuffer
+        #     self.runInstruction(line)
 
     
     def __getLock(self, T: Transaction, x: str, lockType: str) -> bool:
@@ -443,16 +446,16 @@ class TransactionManager():
             aquiredLock, blockingTransaction = self.lockTable.getReadLock(T, x)
         else:
             aquiredLock, blockingTransaction = self.lockTable.getWriteLock(T, x)
-        T.locks[x] = aquiredLock
-        return True
+        # T.locks[x] = aquiredLock
+        # return True
         
-        # if not aquiredLock:
-        #     print(f"Transaction {T.name} wait for transaction {blockingTransaction.name} " 
-        #            "because of lock conflict")
-        # else:
-        #     T.locks[x] = aquiredLock
+        if not aquiredLock:
+            print(f"Transaction {T.name} wait for transaction {blockingTransaction.name} " 
+                   "because of lock conflict")
+        else:
+            T.locks[x] = aquiredLock
 
-        # return aquiredLock is not None
+        return aquiredLock is not None
 
 
 
@@ -525,10 +528,11 @@ def test_dead_lock():
 # test_dead_lock()
 
 TM = TransactionManager()
+lines = []
 for line in stdin:
     line = line.strip()
     if line == "" or line.startswith("//"):
         continue
-    TM.runInstruction(line)
-    TM.tick()
+    lines.append(line)
+TM.run(lines)
 
