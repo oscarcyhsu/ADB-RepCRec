@@ -321,7 +321,9 @@ class TransactionManager():
         assert(transactionName in self.transactions)
         T = self.transactions[transactionName]
         
-        aquiredLock = self.__getLock(T, x, "W")
+        if not self.__getLock(T, x, "W"):
+            return False
+        # aquiredLock = self.__getLock(T, x, "W")
 
         hasDeadLock, victim = self.lockTable.checkDeadLock()
         while hasDeadLock:
@@ -329,9 +331,9 @@ class TransactionManager():
             self.abortTransaction(victim)
             hasDeadLock, victim = self.lockTable.checkDeadLock()
         
-        if not aquiredLock:
-            return False
-        if T.name not in self.transactions: # checkDeadLock abort T
+        # if not aquiredLock:
+        #     return False
+        if T.name not in self.transactions:
             return False
 
         T.variableFinalValues[x] = (val, self.time)
@@ -431,14 +433,16 @@ class TransactionManager():
             aquiredLock, blockingTransaction = self.lockTable.getReadLock(T, x)
         else:
             aquiredLock, blockingTransaction = self.lockTable.getWriteLock(T, x)
+        T.locks[x] = aquiredLock
+        return True
         
-        if not aquiredLock:
-            print(f"Transaction {T.name} wait for transaction {blockingTransaction.name} " 
-                   "because of lock conflict")
-        else:
-            T.locks[x] = aquiredLock
+        # if not aquiredLock:
+        #     print(f"Transaction {T.name} wait for transaction {blockingTransaction.name} " 
+        #            "because of lock conflict")
+        # else:
+        #     T.locks[x] = aquiredLock
 
-        return aquiredLock is not None
+        # return aquiredLock is not None
 
 
 
