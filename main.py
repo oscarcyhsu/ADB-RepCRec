@@ -251,9 +251,10 @@ class TransactionManager():
     def read(self, transactionName: str, x: str):
         assert(transactionName in self.transactions)
         T = self.transactions[transactionName]
+        variableIdx = int(x[1:])
+        variableIsReplicated = (variableIdx % 2 == 0)
+
         if T.RO:
-            variableIdx = int(x[1:])
-            variableIsReplicated = (variableIdx % 2 == 0)
             if variableIsReplicated:
                 for dataManagerIdx, dataManager in enumerate(self.dataManagers):
                     # find the most recent value of x that was committed earlier than T’s start time
@@ -303,7 +304,7 @@ class TransactionManager():
                 if statusHistory:
                     dataManagerLastRecoverTime = statusHistory[-1][1]
 
-                if variableCommitTime > dataManagerLastRecoverTime:
+                if (not variableIsReplicated) or (variableCommitTime > dataManagerLastRecoverTime):
                     print(f"{x}: {value}")
                     T.variableAccessTimes[x].append(self.time)
                     return True
