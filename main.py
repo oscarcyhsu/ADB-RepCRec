@@ -310,8 +310,6 @@ class TransactionManager():
             return False
 
         # regular read
-        # TODO: locking behavior doesn't pass test9
-        # after W(T2,x4,44) but before end(T2),  R(T3,x4) still executes
         if self.__getLock(T, x, "R"):
             # Find a version of x on any site that is up with x_commit_time > site_last_recover_time
             for dataManagerIdx, dataManager in enumerate(self.dataManagers):
