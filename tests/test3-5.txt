@@ -1,0 +1,17 @@
+// Test 3.5
+// T1's write will not go to site 2 because it was down when the write command was issued,
+// so every site except site 2 will have x4 equal to 91
+// x8 will not have value 88 because T2 aborts
+
+
+begin(T1)
+begin(T2)
+R(T1,x3)
+W(T2,x8,88) 
+fail(2)
+R(T2,x3)
+W(T1, x4,91)
+recover(2)
+end(T2)
+end(T1)
+dump()
