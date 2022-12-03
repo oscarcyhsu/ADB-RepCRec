@@ -204,15 +204,16 @@ class TransactionManager():
         self.instructionBuffer = list(lines)
 
         while self.instructionBuffer:
-
-            hasDeadLock, victim = self.lockTable.checkDeadLock()
-            while hasDeadLock:
-                print(f"Deadlock detected, victim is {victim.name}")
-                self.abortTransaction(victim)
-                hasDeadLock, victim = self.lockTable.checkDeadLock()
-
             # see if any waiting instructions can now be run
             for i, line in enumerate(self.instructionBuffer):
+                # resolve deadlock at the beginning of a tick
+                hasDeadLock, victim = self.lockTable.checkDeadLock()
+                if hasDeadLock:
+                    print(f"Deadlock detected, victim is {victim.name}")
+                    self.abortTransaction(victim)
+                    hasDeadLock, victim = self.lockTable.checkDeadLock()
+                    break
+
                 if self.runInstruction(line):
                     self.instructionBuffer.pop(i)
                     self.tick()
