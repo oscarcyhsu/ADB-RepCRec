@@ -1,0 +1,48 @@
+run Instruction begin(T1)
+run Instruction begin(T2)
+run Instruction begin(T3)
+run Instruction W(T3,x2,10)
+run Instruction W(T2,x2,10)
+Transaction T2 wait for transaction T3 because of lock conflict
+run Instruction W(T1,x2,10)
+Transaction T1 wait for transaction T2 because of lock conflict
+run Instruction end(T3)
+Site 1 is written by transaction T3
+Site 2 is written by transaction T3
+Site 3 is written by transaction T3
+Site 4 is written by transaction T3
+Site 5 is written by transaction T3
+Site 6 is written by transaction T3
+Site 7 is written by transaction T3
+Site 8 is written by transaction T3
+Site 9 is written by transaction T3
+Site 10 is written by transaction T3
+T3 commits
+run Instruction W(T2,x2,10)
+run Instruction W(T1,x2,10)
+Transaction T1 wait for transaction T2 because of lock conflict
+run Instruction end(T2)
+Site 1 is written by transaction T2
+Site 2 is written by transaction T2
+Site 3 is written by transaction T2
+Site 4 is written by transaction T2
+Site 5 is written by transaction T2
+Site 6 is written by transaction T2
+Site 7 is written by transaction T2
+Site 8 is written by transaction T2
+Site 9 is written by transaction T2
+Site 10 is written by transaction T2
+T2 commits
+run Instruction W(T1,x2,10)
+run Instruction end(T1)
+Site 1 is written by transaction T1
+Site 2 is written by transaction T1
+Site 3 is written by transaction T1
+Site 4 is written by transaction T1
+Site 5 is written by transaction T1
+Site 6 is written by transaction T1
+Site 7 is written by transaction T1
+Site 8 is written by transaction T1
+Site 9 is written by transaction T1
+Site 10 is written by transaction T1
+T1 commits
