@@ -333,6 +333,8 @@ class TransactionManager():
                 T.variableAccessTimes[x].append(self.time)
                 return True
 
+        # If the TM requests a read and no relevant site is available, then T must wait
+        print(f"{T.name} waiting for regular read on variable {x} due to site failure")
         return False
 
 

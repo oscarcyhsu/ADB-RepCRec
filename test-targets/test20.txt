@@ -29,10 +29,13 @@ run Instruction fail(8)
 run Instruction fail(9)
 run Instruction fail(10)
 run Instruction R(T2,x2)
+T2 waiting for regular read on variable x2 due to site failure
 run Instruction begin(T5)
 run Instruction R(T2,x2)
+T2 waiting for regular read on variable x2 due to site failure
 run Instruction W(T5,x2,90)
 run Instruction R(T2,x2)
+T2 waiting for regular read on variable x2 due to site failure
 run Instruction end(T5)
 Site 1 is written by transaction T5
 T5 commits
