@@ -178,6 +178,7 @@ class LockTable():
                 return True, youngestT
         return False, None
     def printTable(self):
+        print("===locktable===")
         for k, v in self.table.items():
             if v:
                 print(k, ":" + " ".join([f"({t.T.name},{t.type},{t.state.name})" for t in v]))
@@ -210,8 +211,9 @@ class TransactionManager():
                     print(f"Deadlock detected, victim is {victim.name}")
                     self.abortTransaction(victim)
                     break
-                # print(self.instructionBuffer)
-                # self.lockTable.printTable()
+
+                # print(f"inst buffer = {self.instructionBuffer}")
+                self.lockTable.printTable()
                 if self.runInstruction(line):
                     self.instructionBuffer.pop(i)
                     self.tick()
