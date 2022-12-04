@@ -1,0 +1,42 @@
+run Instruction begin(T1)
+run Instruction begin(T2)
+run Instruction W(T1,x2,9)
+run Instruction fail(1)
+run Instruction end(T1)
+Transaction T1 accessed x2 at site 1, but the site failed afterwards
+T1 aborts
+run Instruction begin(T3)
+run Instruction W(T3,x2,100)
+run Instruction end(T3)
+Site 2 is written by transaction T3
+Site 3 is written by transaction T3
+Site 4 is written by transaction T3
+Site 5 is written by transaction T3
+Site 6 is written by transaction T3
+Site 7 is written by transaction T3
+Site 8 is written by transaction T3
+Site 9 is written by transaction T3
+Site 10 is written by transaction T3
+T3 commits
+run Instruction recover(1)
+run Instruction fail(2)
+run Instruction fail(3)
+run Instruction fail(4)
+run Instruction fail(5)
+run Instruction fail(6)
+run Instruction fail(7)
+run Instruction fail(8)
+run Instruction fail(9)
+run Instruction fail(10)
+run Instruction R(T2,x2)
+run Instruction begin(T5)
+run Instruction R(T2,x2)
+run Instruction W(T5,x2,90)
+run Instruction R(T2,x2)
+run Instruction end(T5)
+Site 1 is written by transaction T5
+T5 commits
+run Instruction R(T2,x2)
+x2: 90
+run Instruction end(T2)
+T2 commits

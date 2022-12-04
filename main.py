@@ -309,22 +309,24 @@ class TransactionManager():
             return False
 
         # regular read
-        if self.__getLock(T, x, "R"):
-            # Find a version of x on any site that is up with x_commit_time > site_last_recover_time
-            for dataManagerIdx, dataManager in enumerate(self.dataManagers):
-                if (x not in dataManager.variableValues) or (not self.dataManagerIsUp(dataManagerIdx)):
-                    continue
-                value, variableCommitTime = dataManager.variableValues[x][-1]
-                dataManagerLastRecoverTime = -1
-                # we already know the DataManager is alive here; extract its most recent recovery time if it exists
-                statusHistory = self.dataManagerStatusHistory[dataManagerIdx]
-                if statusHistory:
-                    dataManagerLastRecoverTime = statusHistory[-1][1]
+        # Find a version of x on any site that is up with x_commit_time > site_last_recover_time
+        for dataManagerIdx, dataManager in enumerate(self.dataManagers):
+            if (x not in dataManager.variableValues) or (not self.dataManagerIsUp(dataManagerIdx)):
+                continue
+            value, variableCommitTime = dataManager.variableValues[x][-1]
+            dataManagerLastRecoverTime = -1
+            # we already know the DataManager is alive here; extract its most recent recovery time if it exists
+            statusHistory = self.dataManagerStatusHistory[dataManagerIdx]
+            if statusHistory:
+                dataManagerLastRecoverTime = statusHistory[-1][1]
 
-                if (not variableIsReplicated) or (variableCommitTime > dataManagerLastRecoverTime):
-                    print(f"{x}: {value}")
-                    T.variableAccessTimes[x].append(self.time)
-                    return True
+            if (not variableIsReplicated) or (variableCommitTime > dataManagerLastRecoverTime):
+                if not self.__getLock(T, x, "R"):
+                    return False
+                    
+                print(f"{x}: {value}")
+                T.variableAccessTimes[x].append(self.time)
+                return True
 
         return False
 
