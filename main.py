@@ -110,11 +110,12 @@ class LockTable():
                 else:
                     i += 1
             return "W", None
-        elif len(blockingLocks) != 0 and len(curLocks) != 0:
-            return None, blockingLocks[-1].T
-        elif len(blockingLocks) != 0 and len(curLocks) == 0:
-            self.table[x].append(self.LockTuple(T, "W", State.WAITING))
-            return None, blockingLocks[-1].T
+        elif len(blockingLocks) != 0:
+            if self.LockTuple(T, "W", State.WAITING) in curLocks:
+                return None, blockingLocks[-1].T
+            else:
+                self.table[x].append(self.LockTuple(T, "W", State.WAITING))
+                return None, blockingLocks[-1].T
     '''
     release the lock acquired by T on x. If x is None, release all lock aquired by T.
     '''
