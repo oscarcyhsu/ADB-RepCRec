@@ -14,6 +14,8 @@ from sys import stdin
 # how to clean lock in locktable:
 # iterate through all lock  and find T's lock (slow)
 # iterate through all data items that T has lock on
+def conflict(l1, l2):
+    return l1.T != l2.T and (l1.type == "W" or l2.type == "W")
 
 class Transaction():
     def __init__(self, name, RO, blocked, start):
@@ -63,12 +65,9 @@ class LockTable():
     T': the transation that prevents T from getting a lock - T'/None
     """
     def getReadLock(self, T: Transaction, x: str) -> tuple[str, Transaction]:
-        curLock = self.__getExistLock(T, x)
-        if curLock:
-            if curLock.state == State.GRANTED:
+        for curLock in self.table[x]:
+            if curLock.T == T and curLock.state == State.GRANTED:
                 return curLock.type, None
-            else:
-                raise Exception("encounter blocked operation from the same transaction")
 
         if len(self.table[x]) == 0:
             self.table[x].append(self.LockTuple(T, "R", State.GRANTED))
@@ -86,56 +85,49 @@ class LockTable():
     T': the transation that prevents T from getting a lock - T'/None
     """
     def getWriteLock(self, T: Transaction, x: str) -> tuple[str, Transaction]:
-        curLock = self.__getExistLock(T, x)
-        if curLock:
-            if curLock.type == "W" and curLock.state == State.GRANTED:
-                return curLock.type, None
-            else:
-                raise Exception("encounter blocked operation from the same transaction")
         
-
-        if len(self.table[x]) == 0:
-            newLock = self.LockTuple(T, "W", State.GRANTED)
-            self.table[x].append(newLock)
-            return newLock.type, None
+        curLocks = [lock for lock in self.table[x] if lock.T == T]
+        blockingLocks = [lock for lock in self.table[x] if conflict(lock, self.LockTuple(T, "W", State.WAITING))]
+        
+        if self.LockTuple(T, "W", State.GRANTED) in curLocks:
+            return "W", None
+        elif len(blockingLocks) == 0 and len(curLocks) == 0:
+            self.table[x].append(self.LockTuple(T, "W", State.GRANTED))
+            return "W", None
+        elif len(blockingLocks) == 0 and len(curLocks) != 0:
+            i = 0
+            # set first lock of T to be write lock
+            while i < len(self.table[x]):
+                if self.table[x][i].T == T:
+                    self.table[x][i] = self.LockTuple(T, "W", State.GRANTED)
+                    i += 1
+                    break
+                i += 1
+            # clear the rest locks of T
+            while i < len(self.table[x]):
+                if self.table[x][i].T == T:
+                    self.table[x].pop(i)
+                else:
+                    i += 1
+            return "W", None
         else:
-            blockingLock = self.table[x][-1]
             self.table[x].append(self.LockTuple(T, "W", State.WAITING))
-            return None, blockingLock.T
-
+            return None, blockingLocks[-1].T
     '''
     release the lock acquired by T on x. If x is None, release all lock aquired by T.
     '''
-    def releaseLock(self, T: Transaction, x:str = None):
-        if x != None:
+    def releaseLock(self, T: Transaction):
+        for j in range(1, 21):
+            x = "x"+str(j)
             self.table[x] = list(filter(lambda x:x.T != T, self.table[x]))
+
             for i in range(len(self.table[x])):
                 if i == 0:
-                    self.table[x][i].state = State.GRANTED
-                elif self.table[x][i-1].type != self.table[x][i].type: # one read-lock and one writelock
-                    self.table[x][i].state = State.WAITING
+                    self.table[x][i] = self.table[x][i]._replace(state = State.GRANTED)
+                elif conflict(self.table[x][i], self.table[x][i-1]):
+                    self.table[x][i] = self.table[x][i]._replace(state = State.WAITING)
                 else:
-                    self.table[x][i].state = self.table[x][i-1].state
-        else:
-            for j in range(1, 21):
-                x = "x"+str(j)
-                self.table[x] = list(filter(lambda x:x.T != T, self.table[x]))
-
-                for i in range(len(self.table[x])):
-                    if i == 0:
-                        self.table[x][i] = self.table[x][i]._replace(state = State.GRANTED)
-                    elif self.table[x][i-1].type != self.table[x][i].type: # one read-lock and one writelock
-                        self.table[x][i] = self.table[x][i]._replace(state = State.WAITING)
-                    else:
-                        self.table[x][i] = self.table[x][i]._replace(state = self.table[x][i-1].state)
-    """
-    utility function to return current lock that T has on x. If not exist, return None
-    """
-    def __getExistLock(self, T: Transaction, x: str): 
-        for lock in self.table[x]:
-            if lock.T == T:
-                return lock
-        return None
+                    self.table[x][i] = self.table[x][i]._replace(state = self.table[x][i-1].state)
 
     '''
     bool : whether the there exists a deadlock
@@ -143,14 +135,17 @@ class LockTable():
     '''
     def checkDeadLock(self) -> tuple[bool, Transaction]:
         
+        
         # build graph
         graph = defaultdict(list)
         visited = defaultdict(int)
         for queue in self.table.values():
             # build edge
             for i in range(1, len(queue)):
-                if queue[i].state == State.WAITING:
-                    graph[queue[i-1].T].append(queue[i].T)
+                for j in range(i, -1, -1):
+                    if conflict(queue[i], queue[j]):
+                        graph[queue[j].T].append(queue[i].T)
+                        break
             # get all node
             for T, _, _ in queue:
                 visited[T] = 0
@@ -182,7 +177,10 @@ class LockTable():
                         youngestAge = T.startTime
                 return True, youngestT
         return False, None
-
+    def printTable(self):
+        for k, v in self.table.items():
+            if v:
+                print(k, ":" + " ".join([f"({t.T.name},{t.type},{t.state.name})" for t in v]))
 
 class TransactionManager():
 
@@ -211,9 +209,9 @@ class TransactionManager():
                 if hasDeadLock:
                     print(f"Deadlock detected, victim is {victim.name}")
                     self.abortTransaction(victim)
-                    hasDeadLock, victim = self.lockTable.checkDeadLock()
                     break
-
+                # print(self.instructionBuffer)
+                # self.lockTable.printTable()
                 if self.runInstruction(line):
                     self.instructionBuffer.pop(i)
                     self.tick()
@@ -428,15 +426,6 @@ class TransactionManager():
     def recover(self, site: str):
         dataManagerIdx = int(site) - 1
         self.dataManagerStatusHistory[dataManagerIdx].append((DATA_MANAGER_RECOVER, self.time))
-        
-        # moved rerun logic to self.run
-
-        # # see if any waiting instructions can now be run (if yes, they should be RO reads)
-        # oldInstructionBuffer = self.instructionBuffer
-        # self.instructionBuffer = [] # reset the instructionBuffer
-        # for line in oldInstructionBuffer:
-        #     # inside runInstruction(), commands that still cannot run will be added to the instructionBuffer
-        #     self.runInstruction(line)
 
     
     def __getLock(self, T: Transaction, x: str, lockType: str) -> bool:
@@ -452,8 +441,7 @@ class TransactionManager():
                    "because of lock conflict")
         else:
             T.locks[x] = aquiredLock
-
-        return aquiredLock is not None
+        return aquiredLock == "W" or aquiredLock == lockType
 
 
 
