@@ -1,0 +1,92 @@
+run Instruction begin(T1)
+run Instruction begin(T2)
+run Instruction begin(T3)
+run Instruction begin(T4)
+run Instruction begin(T5)
+run Instruction R(T3,x3)
+x3: 30
+run Instruction R(T4,x4)
+x4: 40
+run Instruction R(T5,x5)
+x5: 50
+run Instruction R(T1,x1)
+x1: 10
+run Instruction R(T2,x2)
+x2: 20
+run Instruction W(T1,x2,10)
+Transaction T1 wait for transaction T2 because of lock conflict
+run Instruction W(T2,x3,20)
+Transaction T2 wait for transaction T3 because of lock conflict
+run Instruction W(T3,x4,30)
+Transaction T3 wait for transaction T4 because of lock conflict
+run Instruction W(T4,x5,40)
+Transaction T4 wait for transaction T5 because of lock conflict
+run Instruction W(T5,x1,50)
+Transaction T5 wait for transaction T1 because of lock conflict
+Deadlock detected, victim is T5
+T5 aborts
+run Instruction W(T1,x2,10)
+Transaction T1 wait for transaction T2 because of lock conflict
+run Instruction W(T2,x3,20)
+Transaction T2 wait for transaction T3 because of lock conflict
+run Instruction W(T3,x4,30)
+Transaction T3 wait for transaction T4 because of lock conflict
+run Instruction W(T4,x5,40)
+run Instruction W(T1,x2,10)
+Transaction T1 wait for transaction T2 because of lock conflict
+run Instruction W(T2,x3,20)
+Transaction T2 wait for transaction T3 because of lock conflict
+run Instruction W(T3,x4,30)
+Transaction T3 wait for transaction T4 because of lock conflict
+run Instruction W(T5,x1,50)
+run Instruction W(T1,x2,10)
+Transaction T1 wait for transaction T2 because of lock conflict
+run Instruction W(T2,x3,20)
+Transaction T2 wait for transaction T3 because of lock conflict
+run Instruction W(T3,x4,30)
+Transaction T3 wait for transaction T4 because of lock conflict
+run Instruction end(T4)
+Site 6 is written by transaction T4
+T4 commits
+run Instruction W(T1,x2,10)
+Transaction T1 wait for transaction T2 because of lock conflict
+run Instruction W(T2,x3,20)
+Transaction T2 wait for transaction T3 because of lock conflict
+run Instruction W(T3,x4,30)
+run Instruction W(T1,x2,10)
+Transaction T1 wait for transaction T2 because of lock conflict
+run Instruction W(T2,x3,20)
+Transaction T2 wait for transaction T3 because of lock conflict
+run Instruction end(T3)
+Site 1 is written by transaction T3
+Site 2 is written by transaction T3
+Site 3 is written by transaction T3
+Site 4 is written by transaction T3
+Site 5 is written by transaction T3
+Site 6 is written by transaction T3
+Site 7 is written by transaction T3
+Site 8 is written by transaction T3
+Site 9 is written by transaction T3
+Site 10 is written by transaction T3
+T3 commits
+run Instruction W(T1,x2,10)
+Transaction T1 wait for transaction T2 because of lock conflict
+run Instruction W(T2,x3,20)
+run Instruction W(T1,x2,10)
+Transaction T1 wait for transaction T2 because of lock conflict
+run Instruction end(T2)
+Site 4 is written by transaction T2
+T2 commits
+run Instruction W(T1,x2,10)
+run Instruction end(T1)
+Site 1 is written by transaction T1
+Site 2 is written by transaction T1
+Site 3 is written by transaction T1
+Site 4 is written by transaction T1
+Site 5 is written by transaction T1
+Site 6 is written by transaction T1
+Site 7 is written by transaction T1
+Site 8 is written by transaction T1
+Site 9 is written by transaction T1
+Site 10 is written by transaction T1
+T1 commits
