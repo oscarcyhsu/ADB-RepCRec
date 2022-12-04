@@ -110,7 +110,9 @@ class LockTable():
                 else:
                     i += 1
             return "W", None
-        else:
+        elif len(blockingLocks) != 0 and len(curLocks) != 0:
+            return None, blockingLocks[-1].T
+        elif len(blockingLocks) != 0 and len(curLocks) == 0:
             self.table[x].append(self.LockTuple(T, "W", State.WAITING))
             return None, blockingLocks[-1].T
     '''
@@ -142,7 +144,7 @@ class LockTable():
         for queue in self.table.values():
             # build edge
             for i in range(1, len(queue)):
-                for j in range(i, -1, -1):
+                for j in range(i-1, -1, -1):
                     if conflict(queue[i], queue[j]):
                         graph[queue[j].T].append(queue[i].T)
                         break
