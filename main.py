@@ -213,7 +213,7 @@ class TransactionManager():
                     break
 
                 # print(f"inst buffer = {self.instructionBuffer}")
-                self.lockTable.printTable()
+                # self.lockTable.printTable()
                 if self.runInstruction(line):
                     self.instructionBuffer.pop(i)
                     self.tick()
